@@ -2,15 +2,16 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Clock, Activity, Bell, MapPin } from 'lucide-react';
+import { Clock, Activity, Bell, MapPin, AlertTriangle } from 'lucide-react';
 
-export default function PatientDashboard() {
+export default function CaregiverDashboard() {
 
   const [time, setTime] = useState('');
   const [greeting, setGreeting] = useState('');
 
   const [activities, setActivities] = useState<any[]>([]);
   const [reminders, setReminders] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
 
   // ⏰ TIME + GREETING
   useEffect(() => {
@@ -26,7 +27,7 @@ export default function PatientDashboard() {
 
       const hour = now.getHours();
 
-      if (hour < 12) setGreeting('Good Morning 🌅');
+      if (hour < 12) setGreeting('Good Morning 👨‍⚕️');
       else if (hour < 18) setGreeting('Good Afternoon ☀️');
       else setGreeting('Good Evening 🌙');
     };
@@ -37,22 +38,24 @@ export default function PatientDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // 📦 LOAD DATA FROM LOCALSTORAGE
+  // 📦 LOAD DATA
   useEffect(() => {
     const act = localStorage.getItem("activities");
     const rem = localStorage.getItem("reminders");
+    const al = localStorage.getItem("alerts");
 
     if (act) setActivities(JSON.parse(act));
     if (rem) setReminders(JSON.parse(rem));
+    if (al) setAlerts(JSON.parse(al));
   }, []);
 
-  // 🔥 GET DATA
+  // 🔥 DATA
   const lastActivity = activities[0];
   const activityCount = activities.length;
-
   const nextReminder = reminders.find(r => r.next && !r.done);
+  const latestAlert = alerts[0];
 
-  // 🌌 PARTICLES
+  // 🌌 PARTICLES (same)
   function ParticleCanvas() {
     const canvasRef = useRef<HTMLCanvasElement>(null);
 
@@ -113,7 +116,7 @@ export default function PatientDashboard() {
         {/* HEADER */}
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-8">
           <h1 className="text-2xl font-bold">{greeting} 👋</h1>
-          <p className="text-slate-400 text-sm">Here’s your real-time overview</p>
+          <p className="text-slate-400 text-sm">Patient Monitoring Overview</p>
         </motion.div>
 
         {/* TIME */}
@@ -130,36 +133,36 @@ export default function PatientDashboard() {
 
           <motion.div
             whileHover={{ scale: 1.05 }}
-            onClick={() => window.location.href = '/patient/activities'}
+            onClick={() => window.location.href = '/caregiver/activities'}
             className="p-5 rounded-2xl bg-white/10 border border-white/20 text-center cursor-pointer"
           >
             <Activity className="mx-auto text-emerald-400 mb-2" />
-            Log Activity
+            View Activity
           </motion.div>
 
           <motion.div
             whileHover={{ scale: 1.05 }}
-            onClick={() => window.location.href = '/patient/reminders'}
+            onClick={() => window.location.href = '/caregiver/reminders'}
             className="p-5 rounded-2xl bg-white/10 border border-white/20 text-center cursor-pointer"
           >
             <Bell className="mx-auto text-emerald-400 mb-2" />
-            Reminders
+            Manage Reminders
           </motion.div>
 
           <motion.div
             whileHover={{ scale: 1.05 }}
-            onClick={() => window.location.href = '/patient/location'}
+            onClick={() => window.location.href = '/caregiver/location'}
             className="p-5 rounded-2xl bg-white/10 border border-white/20 text-center"
           >
             <MapPin className="mx-auto text-emerald-400 mb-2" />
-            Location
+            Track Location
           </motion.div>
 
         </div>
 
-        {/* REAL ACTIVITY DATA */}
+        {/* ACTIVITY SUMMARY */}
         <div className="p-6 rounded-2xl bg-white/10 border border-white/20 mb-6">
-          <h2 className="text-lg mb-2">Activity Summary</h2>
+          <h2 className="text-lg mb-2">Patient Activity</h2>
 
           {lastActivity ? (
             <>
@@ -167,7 +170,7 @@ export default function PatientDashboard() {
               <p className="text-xs text-slate-400">{lastActivity.time}</p>
             </>
           ) : (
-            <p className="text-slate-400 text-sm">No activity yet</p>
+            <p className="text-slate-400 text-sm">No activity recorded</p>
           )}
 
           <p className="text-xs mt-2 text-slate-400">
@@ -175,9 +178,9 @@ export default function PatientDashboard() {
           </p>
         </div>
 
-        {/* REAL REMINDER */}
-        <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-400/30">
-          <h2 className="text-lg mb-2">Next Reminder</h2>
+        {/* NEXT MEDICATION */}
+        <div className="p-6 rounded-2xl bg-emerald-500/10 border border-emerald-400/30 mb-6">
+          <h2 className="text-lg mb-2">Next Medication</h2>
 
           {nextReminder ? (
             <p className="text-emerald-300 text-sm">
@@ -186,6 +189,21 @@ export default function PatientDashboard() {
           ) : (
             <p className="text-slate-400 text-sm">
               No upcoming reminders
+            </p>
+          )}
+        </div>
+
+        {/* ALERT SECTION */}
+        <div className="p-6 rounded-2xl bg-red-500/10 border border-red-400/30">
+          <h2 className="text-lg mb-2">Alerts 🚨</h2>
+
+          {latestAlert ? (
+            <p className="text-red-300 text-sm">
+              {latestAlert.text}
+            </p>
+          ) : (
+            <p className="text-slate-400 text-sm">
+              No alerts
             </p>
           )}
         </div>

@@ -1,106 +1,244 @@
-'use client';
+"use client";
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { Bell, CheckCircle } from 'lucide-react';
+import { useState, useEffect } from "react";
+import { Bell, CheckCircle, Trash2, Plus } from "lucide-react";
+import { motion } from "framer-motion";
 
 export default function RemindersPage() {
-  const [reminders, setReminders] = useState([
-    { id: 1, text: "Medicine at 8 AM", time: "08:00", next: false, missed: true, done: false },
-    { id: 2, text: "Lunch at 1 PM", time: "13:00", next: true, missed: false, done: false },
-    { id: 3, text: "Medicine at 8 PM", time: "20:00", next: false, missed: false, done: false },
-  ]);
+  const [reminders, setReminders] = useState<any[]>([]);
+  const [text, setText] = useState("");
+  const [time, setTime] = useState("");
+  const [now, setNow] = useState(new Date());
 
-  const markAsDone = (id: number) => {
+  // ⏱ LIVE CLOCK
+  useEffect(() => {
+    const i = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(i);
+  }, []);
+
+  // 🔔 PERMISSION
+  useEffect(() => {
+    if (Notification.permission !== "granted") {
+      Notification.requestPermission();
+    }
+  }, []);
+
+  // 📦 LOAD
+  useEffect(() => {
+    const data = localStorage.getItem("reminders");
+    if (data) setReminders(JSON.parse(data));
+  }, []);
+
+  // 💾 SAVE
+  useEffect(() => {
+    localStorage.setItem("reminders", JSON.stringify(reminders));
+  }, [reminders]);
+
+  // 🔊 SOUND
+  const playSound = () => {
+    const audio = new Audio("/alert.mp3"); // put file in public folder
+    audio.play();
+  };
+
+  // 📱 VIBRATION
+  const vibrate = () => {
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
+  };
+
+  // ⏰ TIME → MINUTES
+  const toMinutes = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    return h * 60 + m;
+  };
+
+  const currentMinutes =
+    now.getHours() * 60 + now.getMinutes();
+
+  // 🔔 ALERT ENGINE
+  useEffect(() => {
+    reminders.forEach((r) => {
+      const reminderMinutes = toMinutes(r.time);
+
+      if (
+        reminderMinutes === currentMinutes &&
+        !r.triggered &&
+        !r.done
+      ) {
+        // 🔔 Notification
+        if (Notification.permission === "granted") {
+          new Notification("Reminder", {
+            body: r.text,
+          });
+        }
+
+        playSound();
+        vibrate();
+
+        setReminders((prev) =>
+          prev.map((item) =>
+            item.id === r.id
+              ? { ...item, triggered: true }
+              : item
+          )
+        );
+      }
+    });
+  }, [now]);
+
+  // ➕ ADD
+  const addReminder = () => {
+    if (!text || !time) return;
+
+    setReminders([
+      ...reminders,
+      {
+        id: Date.now(),
+        text,
+        time,
+        done: false,
+        triggered: false,
+      },
+    ]);
+
+    setText("");
+    setTime("");
+  };
+
+  // ✅ DONE
+  const markDone = (id: number) => {
     setReminders(reminders.map(r =>
-      r.id === id ? { ...r, done: true, next: false, missed: false } : r
+      r.id === id ? { ...r, done: true } : r
     ));
   };
 
-  const missedReminders = reminders.filter(r => r.missed && !r.done);
-  const todayReminders = reminders.filter(r => !r.missed && !r.done);
+  // ❌ DELETE
+  const del = (id: number) => {
+    setReminders(reminders.filter(r => r.id !== id));
+  };
+
+  // ⏳ COUNTDOWN
+  const countdown = (t: string) => {
+    const [h, m] = t.split(":").map(Number);
+    const target = new Date();
+    target.setHours(h, m, 0);
+
+    const diff = target.getTime() - now.getTime();
+
+    if (diff <= 0) return "Now";
+
+    const min = Math.floor(diff / 60000);
+    const sec = Math.floor((diff % 60000) / 1000);
+
+    return `${min}m ${sec}s`;
+  };
+
+  // 🧠 LOGIC
+  const processed = reminders.map(r => {
+    const minutes = toMinutes(r.time);
+
+    return {
+      ...r,
+      missed: !r.done && minutes < currentMinutes,
+      next: !r.done && minutes >= currentMinutes,
+    };
+  });
+
+  const missed = processed.filter(r => r.missed);
+  const upcoming = processed.filter(r => r.next);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white p-6">
 
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Bell className="text-emerald-400" />
-          Reminders
-        </h1>
-        <p className="text-slate-400 text-sm">Manage your daily reminders</p>
+      {/* HEADER */}
+      <h1 className="text-2xl font-bold flex gap-2 mb-6">
+        <Bell className="text-emerald-400"/> Smart Reminders
+      </h1>
+
+      {/* ADD */}
+      <div className="flex gap-2 mb-6">
+        <input
+          placeholder="Reminder (e.g. Medicine)"
+          value={text}
+          onChange={(e)=>setText(e.target.value)}
+          className="flex-1 p-3 bg-white/5 rounded-xl border border-white/10"
+        />
+
+        <input
+          type="time"
+          value={time}
+          onChange={(e)=>setTime(e.target.value)}
+          className="p-3 bg-white/5 rounded-xl border border-white/10"
+        />
+
+        <button
+          onClick={addReminder}
+          className="bg-emerald-500 px-4 rounded-xl"
+        >
+          <Plus/>
+        </button>
       </div>
 
-      {/* Missed Reminders */}
-      {missedReminders.length > 0 && (
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-red-400 mb-3">Missed</h2>
+      {/* MISSED */}
+      {missed.length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-red-400 mb-2">Missed</h2>
 
-          <div className="space-y-4">
-            {missedReminders.map(r => (
-              <motion.div
-                key={r.id}
-                whileHover={{ scale: 1.02 }}
-                className="p-5 rounded-2xl bg-red-500/10 border border-red-500/20 flex justify-between items-center"
-              >
-                <span className="text-sm">{r.text}</span>
+          {missed.map(r => (
+            <motion.div
+              key={r.id}
+              className="p-4 mb-3 bg-red-500/10 border border-red-500/20 rounded-xl flex justify-between"
+            >
+              <div>
+                <p>{r.text}</p>
+                <p className="text-xs">{r.time}</p>
+              </div>
 
-                <button
-                  onClick={() => markAsDone(r.id)}
-                  className="flex items-center gap-2 bg-red-500 hover:bg-red-600 px-4 py-2 rounded-xl text-sm"
-                >
-                  <CheckCircle size={16} />
-                  Done
+              <div className="flex gap-2">
+                <button onClick={()=>markDone(r.id)}>
+                  <CheckCircle/>
                 </button>
-              </motion.div>
-            ))}
-          </div>
+                <button onClick={()=>del(r.id)}>
+                  <Trash2/>
+                </button>
+              </div>
+            </motion.div>
+          ))}
         </div>
       )}
 
-      {/* Today Reminders */}
+      {/* NEXT */}
       <div>
-        <h2 className="text-lg font-semibold mb-3">Today</h2>
+        <h2 className="mb-2">Upcoming</h2>
 
-        <div className="space-y-4">
-          {todayReminders.map(r => (
+        {upcoming.length === 0 ? (
+          <div className="text-center p-6 bg-white/5 rounded-xl">
+            No reminders yet 📝
+          </div>
+        ) : (
+          upcoming.map(r => (
             <motion.div
               key={r.id}
-              whileHover={{ scale: 1.02 }}
-              className={`p-5 rounded-2xl border flex justify-between items-center transition ${
-                r.next
-                  ? 'bg-emerald-500/10 border-emerald-400/30'
-                  : 'bg-white/5 border-white/10'
-              }`}
+              className="p-4 mb-3 bg-emerald-500/10 border border-emerald-400/30 rounded-xl flex justify-between"
             >
               <div>
-                {r.next && (
-                  <p className="text-xs text-emerald-400 mb-1">Next</p>
-                )}
-                <span className="text-sm">{r.text}</span>
+                <p className="text-xs text-emerald-400">
+                  ⏳ {countdown(r.time)}
+                </p>
+                <p>{r.text}</p>
+                <p className="text-xs text-slate-400">{r.time}</p>
               </div>
 
-              <button
-                onClick={() => markAsDone(r.id)}
-                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm ${
-                  r.next
-                    ? 'bg-emerald-500 hover:bg-emerald-600'
-                    : 'bg-slate-700 hover:bg-slate-600'
-                }`}
-              >
-                <CheckCircle size={16} />
-                Done
-              </button>
+              <div className="flex gap-2">
+                <button onClick={()=>markDone(r.id)}>
+                  <CheckCircle/>
+                </button>
+                <button onClick={()=>del(r.id)}>
+                  <Trash2/>
+                </button>
+              </div>
             </motion.div>
-          ))}
-
-          {todayReminders.length === 0 && (
-            <div className="p-6 text-center rounded-2xl bg-white/5 border border-white/10">
-              <p className="text-slate-400 text-sm">All tasks completed 🎉</p>
-            </div>
-          )}
-        </div>
+          ))
+        )}
       </div>
 
     </div>
